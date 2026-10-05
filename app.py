@@ -12,7 +12,7 @@ from google import genai
 st.set_page_config(
     page_title="AI Article Analyser",
     page_icon="📰",
-    layout="centered"
+    layout="wide"
 )
 
 
@@ -31,118 +31,117 @@ gemini = genai.Client(
 
 
 # ============================================================
-# TITLE
+# SIDEBAR NAVIGATION
 # ============================================================
 
-st.title("📰 AI Article Analyser")
+st.sidebar.title("📰 AI Article Analyser")
 
-st.markdown(
-    "### Turn news into economic understanding."
-)
-
-st.write(
-    "Upload an Economic Times article and understand "
-    "the economics behind the news."
-)
-
-st.divider()
-
-
-# ============================================================
-# UPLOAD
-# ============================================================
-
-st.subheader("📄 Upload Article")
-
-uploaded_file = st.file_uploader(
-    "Choose a PDF or TXT article",
-    type=["pdf", "txt"]
+page = st.sidebar.radio(
+    "Navigate",
+    [
+        "📰 Analyse Article",
+        "📚 My Articles"
+    ]
 )
 
 
-if uploaded_file is not None:
+# ============================================================
+# PAGE 1 — ANALYSE ARTICLE
+# ============================================================
 
-    st.success(
-        f"Uploaded: {uploaded_file.name}"
+if page == "📰 Analyse Article":
+
+    st.title("📰 AI Article Analyser")
+
+    st.markdown(
+        "### Turn news into economic understanding."
     )
 
+    st.write(
+        "Upload an Economic Times article and understand "
+        "the economics behind the news."
+    )
 
-    # ========================================================
-    # EXTRACT TEXT
-    # ========================================================
+    st.divider()
 
-    extracted_text = ""
+    st.subheader("📄 Upload Article")
 
-    if uploaded_file.name.lower().endswith(".pdf"):
+    uploaded_file = st.file_uploader(
+        "Choose a PDF or TXT article",
+        type=["pdf", "txt"]
+    )
 
-        pdf_reader = PyPDF2.PdfReader(
-            uploaded_file
+    if uploaded_file is not None:
+
+        st.success(
+            f"Uploaded: {uploaded_file.name}"
         )
 
-        for page in pdf_reader.pages:
+        # ----------------------------------------------------
+        # EXTRACT TEXT
+        # ----------------------------------------------------
 
-            page_text = page.extract_text()
+        extracted_text = ""
 
-            if page_text:
-                extracted_text += page_text + "\n"
+        if uploaded_file.name.lower().endswith(".pdf"):
 
-    else:
-
-        extracted_text = (
-            uploaded_file
-            .read()
-            .decode(
-                "utf-8",
-                errors="ignore"
-            )
-        )
-
-
-    # ========================================================
-    # CHECK TEXT
-    # ========================================================
-
-    if not extracted_text.strip():
-
-        st.error(
-            "I couldn't extract text from this article."
-        )
-
-    else:
-
-        # ====================================================
-        # PREVIEW
-        # ====================================================
-
-        with st.expander(
-            "📖 View extracted article"
-        ):
-
-            st.text_area(
-                "Article text",
-                extracted_text,
-                height=400,
-                label_visibility="collapsed"
+            pdf_reader = PyPDF2.PdfReader(
+                uploaded_file
             )
 
+            for page in pdf_reader.pages:
 
-        st.divider()
+                page_text = page.extract_text()
 
+                if page_text:
+                    extracted_text += page_text + "\n"
 
-        # ====================================================
-        # ANALYSE BUTTON
-        # ====================================================
+        else:
 
-        if st.button(
-            "🔍 Analyse Article",
-            use_container_width=True
-        ):
+            extracted_text = (
+                uploaded_file
+                .read()
+                .decode(
+                    "utf-8",
+                    errors="ignore"
+                )
+            )
 
-            # =================================================
-            # PROMPT
-            # =================================================
+        # ----------------------------------------------------
+        # CHECK TEXT
+        # ----------------------------------------------------
 
-            prompt = f"""
+        if not extracted_text.strip():
+
+            st.error(
+                "I couldn't extract text from this article."
+            )
+
+        else:
+
+            with st.expander(
+                "📖 View extracted article"
+            ):
+
+                st.text_area(
+                    "Article text",
+                    extracted_text,
+                    height=400,
+                    label_visibility="collapsed"
+                )
+
+            st.divider()
+
+            # ------------------------------------------------
+            # ANALYSE
+            # ------------------------------------------------
+
+            if st.button(
+                "🔍 Analyse Article",
+                use_container_width=True
+            ):
+
+                prompt = f"""
 You are an economics tutor helping a first-year MBA student.
 
 Analyse the following economic news article.
@@ -192,14 +191,6 @@ Explain the economic chain step by step.
 
 Use arrows where useful.
 
-Example:
-
-Higher oil prices
-→ higher input costs
-→ higher transportation costs
-→ higher prices
-→ inflationary pressure
-
 
 ## 5. ECONOMIC IMPACT
 
@@ -245,134 +236,406 @@ IMPORTANT RULES:
 5. Do not discuss unrelated concepts.
 """
 
+                # --------------------------------------------
+                # GEMINI
+                # --------------------------------------------
 
-            # =================================================
-            # GEMINI ANALYSIS
-            # =================================================
+                with st.spinner(
+                    "🧠 Analysing the article..."
+                ):
 
-            st.write(
-                "🧠 Analysing the article..."
-            )
+                    analysis = None
+                    last_error = None
 
-            analysis = None
-            last_error = None
+                    for attempt in range(2):
 
+                        try:
 
-            # Try lightweight model twice
-            for attempt in range(2):
+                            response = (
+                                gemini.models.generate_content(
+                                    model="gemini-3.1-flash-lite",
+                                    contents=prompt
+                                )
+                            )
 
-                try:
+                            analysis = response.text
+                            break
 
-                    response = (
-                        gemini.models.generate_content(
-                            model="gemini-3.1-flash-lite",
-                            contents=prompt
-                        )
-                    )
+                        except Exception as e:
 
-                    analysis = response.text
+                            last_error = e
 
-                    break
+                            if attempt == 0:
+                                time.sleep(5)
 
-                except Exception as e:
+                    # ----------------------------------------
+                    # FALLBACK MODEL
+                    # ----------------------------------------
 
-                    last_error = e
+                    if analysis is None:
 
-                    if attempt == 0:
-                        time.sleep(5)
+                        try:
 
+                            response = (
+                                gemini.models.generate_content(
+                                    model="gemini-3.6-flash",
+                                    contents=prompt
+                                )
+                            )
 
-            # =================================================
-            # FALLBACK MODEL
-            # =================================================
+                            analysis = response.text
 
-            if analysis is None:
+                        except Exception as e:
 
-                st.write(
-                    "Trying the backup Gemini model..."
-                )
+                            last_error = e
 
-                try:
+                # --------------------------------------------
+                # IF ANALYSIS FAILED
+                # --------------------------------------------
 
-                    response = (
-                        gemini.models.generate_content(
-                            model="gemini-3.6-flash",
-                            contents=prompt
-                        )
-                    )
-
-                    analysis = response.text
-
-                except Exception as e:
-
-                    last_error = e
-
-
-            # =================================================
-            # DISPLAY / SAVE
-            # =================================================
-
-            if analysis is None:
-
-                st.error(
-                    f"Could not analyse the article: {last_error}"
-                )
-
-            else:
-
-                st.success(
-                    "✅ Article analysed successfully!"
-                )
-
-                st.subheader(
-                    "🧠 Economic Analysis"
-                )
-
-                st.markdown(
-                    analysis
-                )
-
-
-                # =============================================
-                # SAVE COMPLETE ARTICLE
-                # =============================================
-
-                st.write(
-                    "💾 Saving article and analysis..."
-                )
-
-                article_data = {
-                    "title": uploaded_file.name,
-                    "source": "Economic Times",
-                    "article_text": extracted_text,
-                    "analysis": analysis
-                }
-
-                try:
-
-                    supabase.table(
-                        "articles"
-                    ).insert(
-                        article_data
-                    ).execute()
-
-                    st.success(
-                        "✅ Article and analysis saved successfully!"
-                    )
-
-                except Exception as e:
+                if analysis is None:
 
                     st.error(
-                        f"Analysis was generated, but could not be saved: {e}"
+                        f"Could not analyse the article: "
+                        f"{last_error}"
                     )
 
+                else:
+
+                    # ----------------------------------------
+                    # DISPLAY
+                    # ----------------------------------------
+
+                    st.success(
+                        "✅ Article analysed successfully!"
+                    )
+
+                    st.subheader(
+                        "🧠 Economic Analysis"
+                    )
+
+                    st.markdown(
+                        analysis
+                    )
+
+                    # ----------------------------------------
+                    # SAVE TO SUPABASE
+                    # ----------------------------------------
+
+                    st.write(
+                        "💾 Saving article..."
+                    )
+
+                    try:
+
+                        article_data = {
+                            "title": uploaded_file.name,
+                            "source": "Economic Times",
+                            "article_text": extracted_text,
+                            "analysis": analysis
+                        }
+
+                        supabase.table(
+                            "articles"
+                        ).insert(
+                            article_data
+                        ).execute()
+
+                        st.success(
+                            "✅ Article and analysis saved!"
+                        )
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Could not save the article: {e}"
+                        )
+
 
 # ============================================================
-# FOOTER
+# PAGE 2 — MY ARTICLES
 # ============================================================
 
-st.divider()
+elif page == "📚 My Articles":
 
-st.caption(
-    "AI Article Analyser • Built for daily economic news reading"
-)
+    st.title("📚 My Articles")
+
+    st.write(
+        "Your saved economic news and analyses."
+    )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # SEARCH
+    # --------------------------------------------------------
+
+    search_term = st.text_input(
+        "🔎 Search your articles",
+        placeholder="Search by article title..."
+    )
+
+    # --------------------------------------------------------
+    # FETCH ARTICLES
+    # --------------------------------------------------------
+
+    try:
+
+        query = (
+            supabase
+            .table("articles")
+            .select("*")
+            .order(
+                "created_at",
+                desc=True
+            )
+        )
+
+        if search_term.strip():
+
+            query = query.ilike(
+                "title",
+                f"%{search_term.strip()}%"
+            )
+
+        result = query.execute()
+
+        articles = result.data
+
+    except Exception as e:
+
+        st.error(
+            f"Could not load your articles: {e}"
+        )
+
+        articles = []
+
+
+    # --------------------------------------------------------
+    # NO ARTICLES
+    # --------------------------------------------------------
+
+    if not articles:
+
+        st.info(
+            "No saved articles found."
+        )
+
+        st.write(
+            "Analyse your first article from the "
+            "'Analyse Article' section."
+        )
+
+
+    # --------------------------------------------------------
+    # DISPLAY ARTICLES
+    # --------------------------------------------------------
+
+    else:
+
+        st.write(
+            f"**{len(articles)} article(s) found**"
+        )
+
+        for article in articles:
+
+            article_id = article.get("id")
+
+            title = article.get(
+                "title",
+                "Untitled Article"
+            )
+
+            source = article.get(
+                "source",
+                "Unknown source"
+            )
+
+            created_at = article.get(
+                "created_at",
+                ""
+            )
+
+            # -----------------------------------------------
+            # ARTICLE CARD
+            # -----------------------------------------------
+
+            with st.container(border=True):
+
+                st.subheader(
+                    title
+                )
+
+                st.caption(
+                    f"{source}  •  {created_at}"
+                )
+
+                col1, col2 = st.columns(
+                    [3, 1]
+                )
+
+                # -------------------------------------------
+                # READ
+                # -------------------------------------------
+
+                with col1:
+
+                    if st.button(
+                        "📖 Read Article",
+                        key=f"read_{article_id}",
+                        use_container_width=True
+                    ):
+
+                        st.session_state[
+                            "selected_article"
+                        ] = article_id
+
+                # -------------------------------------------
+                # DELETE
+                # -------------------------------------------
+
+                with col2:
+
+                    if st.button(
+                        "🗑️ Delete",
+                        key=f"delete_{article_id}",
+                        use_container_width=True
+                    ):
+
+                        st.session_state[
+                            f"confirm_delete_{article_id}"
+                        ] = True
+
+
+                # -------------------------------------------
+                # DELETE CONFIRMATION
+                # -------------------------------------------
+
+                if st.session_state.get(
+                    f"confirm_delete_{article_id}",
+                    False
+                ):
+
+                    st.warning(
+                        "Are you sure you want to permanently "
+                        "delete this article and its analysis?"
+                    )
+
+                    confirm_col, cancel_col = st.columns(2)
+
+                    with confirm_col:
+
+                        if st.button(
+                            "Yes, delete",
+                            key=f"confirm_{article_id}",
+                            use_container_width=True
+                        ):
+
+                            try:
+
+                                supabase.table(
+                                    "articles"
+                                ).delete().eq(
+                                    "id",
+                                    article_id
+                                ).execute()
+
+                                st.session_state[
+                                    f"confirm_delete_{article_id}"
+                                ] = False
+
+                                st.session_state.pop(
+                                    "selected_article",
+                                    None
+                                )
+
+                                st.success(
+                                    "🗑️ Article deleted."
+                                )
+
+                                st.rerun()
+
+                            except Exception as e:
+
+                                st.error(
+                                    f"Could not delete article: {e}"
+                                )
+
+                    with cancel_col:
+
+                        if st.button(
+                            "Cancel",
+                            key=f"cancel_{article_id}",
+                            use_container_width=True
+                        ):
+
+                            st.session_state[
+                                f"confirm_delete_{article_id}"
+                            ] = False
+
+                            st.rerun()
+
+
+    # ========================================================
+    # SELECTED ARTICLE
+    # ========================================================
+
+    selected_id = st.session_state.get(
+        "selected_article"
+    )
+
+    if selected_id:
+
+        selected_article = next(
+            (
+                article
+                for article in articles
+                if article.get("id") == selected_id
+            ),
+            None
+        )
+
+        if selected_article:
+
+            st.divider()
+
+            st.header(
+                selected_article.get(
+                    "title",
+                    "Article"
+                )
+            )
+
+            st.caption(
+                f"{selected_article.get('source', '')} "
+                f"• "
+                f"{selected_article.get('created_at', '')}"
+            )
+
+            st.subheader(
+                "📄 Original Article"
+            )
+
+            st.text_area(
+                "Original article",
+                selected_article.get(
+                    "article_text",
+                    ""
+                ),
+                height=400,
+                disabled=True,
+                label_visibility="collapsed"
+            )
+
+            st.divider()
+
+            st.subheader(
+                "🧠 Economic Analysis"
+            )
+
+            st.markdown(
+                selected_article.get(
+                    "analysis",
+                    "No analysis available."
+                )
+            )
