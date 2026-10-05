@@ -1,6 +1,13 @@
 import streamlit as st
 import PyPDF2
-
+from supabase import create_client
+# -----------------------------
+# SUPABASE CONNECTION
+# -----------------------------
+supabase = create_client(
+    st.secrets["SUPABASE_URL"],
+    st.secrets["SUPABASE_KEY"]
+)
 # -----------------------------
 # PAGE CONFIGURATION
 # -----------------------------
