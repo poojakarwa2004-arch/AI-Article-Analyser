@@ -1,4 +1,4 @@
 streamlit
 PyPDF2
 supabase
-openai
+google-genai
