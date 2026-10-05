@@ -1,14 +1,7 @@
 import streamlit as st
 import PyPDF2
 from supabase import create_client
-
-# -----------------------------
-# SUPABASE CONNECTION
-# -----------------------------
-supabase = create_client(
-    st.secrets["SUPABASE_URL"],
-    st.secrets["SUPABASE_KEY"]
-)
+from openai import OpenAI
 
 # -----------------------------
 # PAGE CONFIGURATION
@@ -17,6 +10,18 @@ st.set_page_config(
     page_title="AI Article Analyser",
     page_icon="📰",
     layout="centered"
+)
+
+# -----------------------------
+# CONNECTIONS
+# -----------------------------
+supabase = create_client(
+    st.secrets["SUPABASE_URL"],
+    st.secrets["SUPABASE_KEY"]
+)
+
+client = OpenAI(
+    api_key=st.secrets["OPENAI_API_KEY"]
 )
 
 # -----------------------------
@@ -65,7 +70,7 @@ uploaded_file = st.file_uploader(
 )
 
 # -----------------------------
-# PROCESS UPLOADED FILE
+# PROCESS ARTICLE
 # -----------------------------
 if uploaded_file is not None:
 
@@ -75,9 +80,7 @@ if uploaded_file is not None:
 
     try:
 
-        # -----------------------------
         # PDF
-        # -----------------------------
         if uploaded_file.name.lower().endswith(".pdf"):
 
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
@@ -89,9 +92,7 @@ if uploaded_file is not None:
                 if page_text:
                     extracted_text += page_text + "\n"
 
-        # -----------------------------
         # TXT
-        # -----------------------------
         elif uploaded_file.name.lower().endswith(".txt"):
 
             extracted_text = uploaded_file.read().decode(
@@ -100,7 +101,7 @@ if uploaded_file is not None:
             )
 
         # -----------------------------
-        # CHECK EXTRACTED TEXT
+        # CHECK TEXT
         # -----------------------------
         if extracted_text.strip():
 
@@ -118,7 +119,7 @@ if uploaded_file is not None:
             st.divider()
 
             # -----------------------------
-            # SAVE ARTICLE
+            # ANALYSE ARTICLE
             # -----------------------------
             if st.button(
                 "🔍 Analyse Article",
@@ -127,31 +128,99 @@ if uploaded_file is not None:
 
                 try:
 
-                    # Save article to Supabase
-                    response = supabase.table("articles").insert({
-                        "title": uploaded_file.name,
-                        "source": "Economic Times",
-                        "article_text": extracted_text,
-                        "analysis": ""
-                    }).execute()
+                    with st.spinner(
+                        "🧠 Analysing the article..."
+                    ):
 
+                        # -----------------------------
+                        # AI ANALYSIS
+                        # -----------------------------
+                        response = client.responses.create(
+                            model="gpt-5-mini",
+                            input=[
+                                {
+                                    "role": "system",
+                                    "content": """
+You are an economics tutor helping a first-year MBA student
+understand economic news.
+
+Analyse the article clearly and accurately.
+
+Your response must contain:
+
+1. ARTICLE SUMMARY
+Explain what happened in simple language.
+
+2. WHY IT MATTERS
+Explain why this development is economically important.
+
+3. KEY ECONOMIC CONCEPTS
+Identify the relevant macroeconomic/economic concepts
+and explain each one simply.
+
+4. CAUSE AND EFFECT
+Explain the main economic chain of events.
+
+5. IMPACT
+Discuss likely effects on:
+- Inflation
+- GDP/growth
+- Employment
+- Interest rates
+- Government finances
+- Businesses/consumers
+Only discuss concepts that are actually relevant.
+
+6. CRITICAL THINKING
+Point out important assumptions, limitations, or questions
+a reader should consider.
+
+7. MBA TAKEAWAY
+Give 3-5 things an MBA student should remember from this article.
+
+Do not invent facts that are not present in the article.
+Clearly distinguish between information stated in the article
+and your own economic interpretation.
+""",
+                                },
+                                {
+                                    "role": "user",
+                                    "content": extracted_text
+                                }
+                            ]
+                        )
+
+                        analysis = response.output_text
+
+                    # -----------------------------
+                    # DISPLAY ANALYSIS
+                    # -----------------------------
                     st.success(
-                        "✅ Article saved successfully!"
+                        "✅ Article analysed successfully!"
                     )
 
-                    st.info(
-                        """
-                        Your article has been saved to your
-                        personal article library.
+                    st.subheader("🧠 Economic Analysis")
 
-                        AI analysis will be added next.
-                        """
+                    st.markdown(analysis)
+
+                    # -----------------------------
+                    # SAVE ANALYSIS
+                    # -----------------------------
+                    supabase.table("articles").update({
+                        "analysis": analysis
+                    }).eq(
+                        "title",
+                        uploaded_file.name
+                    ).execute()
+
+                    st.success(
+                        "💾 Analysis saved to your article library."
                     )
 
                 except Exception as e:
 
                     st.error(
-                        f"Could not save the article: {e}"
+                        f"Could not analyse the article: {e}"
                     )
 
         else:
@@ -161,8 +230,8 @@ if uploaded_file is not None:
             )
 
             st.info(
-                "If this is a scanned PDF, text extraction "
-                "may not work yet."
+                "If this is a scanned PDF, text extraction may "
+                "not work yet."
             )
 
     except Exception as e:
