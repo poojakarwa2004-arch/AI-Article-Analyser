@@ -49,7 +49,7 @@ st.divider()
 
 
 # ============================================================
-# UPLOAD ARTICLE
+# UPLOAD
 # ============================================================
 
 st.subheader("📄 Upload Article")
@@ -73,7 +73,6 @@ if uploaded_file is not None:
 
     extracted_text = ""
 
-
     if uploaded_file.name.lower().endswith(".pdf"):
 
         pdf_reader = PyPDF2.PdfReader(
@@ -85,11 +84,7 @@ if uploaded_file is not None:
             page_text = page.extract_text()
 
             if page_text:
-
-                extracted_text += (
-                    page_text + "\n"
-                )
-
+                extracted_text += page_text + "\n"
 
     else:
 
@@ -104,7 +99,7 @@ if uploaded_file is not None:
 
 
     # ========================================================
-    # CHECK ARTICLE
+    # CHECK TEXT
     # ========================================================
 
     if not extracted_text.strip():
@@ -116,7 +111,7 @@ if uploaded_file is not None:
     else:
 
         # ====================================================
-        # ARTICLE PREVIEW
+        # PREVIEW
         # ====================================================
 
         with st.expander(
@@ -135,43 +130,13 @@ if uploaded_file is not None:
 
 
         # ====================================================
-        # ANALYSE
+        # ANALYSE BUTTON
         # ====================================================
 
         if st.button(
             "🔍 Analyse Article",
             use_container_width=True
         ):
-
-            # =================================================
-            # SAVE ARTICLE
-            # =================================================
-
-            try:
-
-                article_data = {
-                    "title": uploaded_file.name,
-                    "source": "Economic Times",
-                    "article_text": extracted_text,
-                    "analysis": ""
-                }
-
-                supabase.table(
-                    "articles"
-                ).insert(
-                    article_data
-                ).execute()
-
-                st.success(
-                    "✅ Article saved successfully!"
-                )
-
-            except Exception as e:
-
-                st.error(
-                    f"Could not save the article: {e}"
-                )
-
 
             # =================================================
             # PROMPT
@@ -293,10 +258,7 @@ IMPORTANT RULES:
             last_error = None
 
 
-            # =================================================
-            # TRY LIGHTWEIGHT MODEL
-            # =================================================
-
+            # Try lightweight model twice
             for attempt in range(2):
 
                 try:
@@ -317,7 +279,6 @@ IMPORTANT RULES:
                     last_error = e
 
                     if attempt == 0:
-
                         time.sleep(5)
 
 
@@ -348,7 +309,7 @@ IMPORTANT RULES:
 
 
             # =================================================
-            # RESULT
+            # DISPLAY / SAVE
             # =================================================
 
             if analysis is None:
@@ -358,10 +319,6 @@ IMPORTANT RULES:
                 )
 
             else:
-
-                # =============================================
-                # DISPLAY
-                # =============================================
 
                 st.success(
                     "✅ Article analysed successfully!"
@@ -377,35 +334,36 @@ IMPORTANT RULES:
 
 
                 # =============================================
-                # SAVE ANALYSIS
+                # SAVE COMPLETE ARTICLE
                 # =============================================
+
+                st.write(
+                    "💾 Saving article and analysis..."
+                )
+
+                article_data = {
+                    "title": uploaded_file.name,
+                    "source": "Economic Times",
+                    "article_text": extracted_text,
+                    "analysis": analysis
+                }
 
                 try:
 
                     supabase.table(
                         "articles"
-                    ).update(
-                        {
-                            "analysis": analysis
-                        }
-                    ).eq(
-                        "title",
-                        uploaded_file.name
+                    ).insert(
+                        article_data
                     ).execute()
 
                     st.success(
-                        "💾 Analysis saved to your article library."
+                        "✅ Article and analysis saved successfully!"
                     )
 
                 except Exception as e:
 
-                    st.warning(
-                        "The analysis was generated, "
-                        "but could not be saved to Supabase."
-                    )
-
-                    st.caption(
-                        str(e)
+                    st.error(
+                        f"Analysis was generated, but could not be saved: {e}"
                     )
 
 
