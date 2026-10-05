@@ -1,32 +1,38 @@
 import streamlit as st
 import PyPDF2
 from supabase import create_client
-from openai import OpenAI
+from google import genai
 
-# -----------------------------
+
+# ============================================================
 # PAGE CONFIGURATION
-# -----------------------------
+# ============================================================
+
 st.set_page_config(
     page_title="AI Article Analyser",
     page_icon="📰",
     layout="centered"
 )
 
-# -----------------------------
+
+# ============================================================
 # CONNECTIONS
-# -----------------------------
+# ============================================================
+
 supabase = create_client(
     st.secrets["SUPABASE_URL"],
     st.secrets["SUPABASE_KEY"]
 )
 
-client = OpenAI(
-    api_key=st.secrets["OPENAI_API_KEY"]
+gemini_client = genai.Client(
+    api_key=st.secrets["GEMINI_API_KEY"]
 )
 
-# -----------------------------
+
+# ============================================================
 # TITLE
-# -----------------------------
+# ============================================================
+
 st.title("📰 AI Article Analyser")
 
 st.markdown(
@@ -35,33 +41,37 @@ st.markdown(
 
     Upload an Economic Times article and use this tool to
     understand the article, its economic context, and the
-    macroeconomic concepts behind it.
+    economic concepts behind it.
     """
 )
 
 st.divider()
 
-# -----------------------------
-# WHAT THE APP WILL DO
-# -----------------------------
+
+# ============================================================
+# WHAT THE APP DOES
+# ============================================================
+
 st.subheader("What can you do here?")
 
 st.markdown(
     """
     - 📄 Upload a news article
     - 🧠 Understand the article in simple language
-    - 📊 Identify relevant macroeconomic concepts
+    - 📊 Identify relevant economic concepts
     - 🌍 Understand the broader economic context
     - 🔎 Critically analyse the article
-    - 📰 Connect the article with current developments
+    - 🎓 Extract MBA-level takeaways
     """
 )
 
 st.divider()
 
-# -----------------------------
+
+# ============================================================
 # ARTICLE UPLOAD
-# -----------------------------
+# ============================================================
+
 st.subheader("📄 Upload Article")
 
 uploaded_file = st.file_uploader(
@@ -69,9 +79,11 @@ uploaded_file = st.file_uploader(
     type=["pdf", "txt"]
 )
 
-# -----------------------------
+
+# ============================================================
 # PROCESS ARTICLE
-# -----------------------------
+# ============================================================
+
 if uploaded_file is not None:
 
     st.success(f"Uploaded: {uploaded_file.name}")
@@ -80,7 +92,10 @@ if uploaded_file is not None:
 
     try:
 
+        # ----------------------------------------------------
         # PDF
+        # ----------------------------------------------------
+
         if uploaded_file.name.lower().endswith(".pdf"):
 
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
@@ -92,7 +107,11 @@ if uploaded_file is not None:
                 if page_text:
                     extracted_text += page_text + "\n"
 
+
+        # ----------------------------------------------------
         # TXT
+        # ----------------------------------------------------
+
         elif uploaded_file.name.lower().endswith(".txt"):
 
             extracted_text = uploaded_file.read().decode(
@@ -100,9 +119,11 @@ if uploaded_file is not None:
                 errors="ignore"
             )
 
-        # -----------------------------
-        # CHECK TEXT
-        # -----------------------------
+
+        # ----------------------------------------------------
+        # CHECK WHETHER TEXT WAS EXTRACTED
+        # ----------------------------------------------------
+
         if extracted_text.strip():
 
             st.subheader("📖 Article Preview")
@@ -118,9 +139,11 @@ if uploaded_file is not None:
 
             st.divider()
 
-            # -----------------------------
-            # ANALYSE ARTICLE
-            # -----------------------------
+
+            # =================================================
+            # SAVE + ANALYSE
+            # =================================================
+
             if st.button(
                 "🔍 Analyse Article",
                 use_container_width=True
@@ -128,73 +151,172 @@ if uploaded_file is not None:
 
                 try:
 
+                    # ------------------------------------------------
+                    # SAVE ARTICLE TO SUPABASE
+                    # ------------------------------------------------
+
+                    with st.spinner("💾 Saving article..."):
+
+                        article_data = {
+                            "title": uploaded_file.name,
+                            "source": "Economic Times",
+                            "article_text": extracted_text,
+                            "analysis": ""
+                        }
+
+                        supabase.table("articles").insert(
+                            article_data
+                        ).execute()
+
+
+                    st.success(
+                        "✅ Article saved successfully!"
+                    )
+
+
+                    # ------------------------------------------------
+                    # AI ANALYSIS
+                    # ------------------------------------------------
+
                     with st.spinner(
                         "🧠 Analysing the article..."
                     ):
 
-                        # -----------------------------
-                        # AI ANALYSIS
-                        # -----------------------------
-                        response = client.responses.create(
-                            model="gpt-5-mini",
-                            input=[
-                                {
-                                    "role": "system",
-                                    "content": """
+                        prompt = f"""
 You are an economics tutor helping a first-year MBA student
 understand economic news.
 
-Analyse the article clearly and accurately.
+Analyse the article clearly, accurately and in a way that
+helps the student learn economics rather than merely summarising
+the news.
 
-Your response must contain:
+ARTICLE:
 
-1. ARTICLE SUMMARY
+{extracted_text}
+
+
+Your response must contain the following sections:
+
+## 1. ARTICLE SUMMARY
+
 Explain what happened in simple language.
 
-2. WHY IT MATTERS
+Focus on:
+- What happened?
+- Who is involved?
+- What is changing?
+- What are the important numbers or facts?
+
+
+## 2. WHY IT MATTERS
+
 Explain why this development is economically important.
 
-3. KEY ECONOMIC CONCEPTS
-Identify the relevant macroeconomic/economic concepts
-and explain each one simply.
+Connect the news to the broader economy wherever relevant.
 
-4. CAUSE AND EFFECT
-Explain the main economic chain of events.
 
-5. IMPACT
-Discuss likely effects on:
+## 3. KEY ECONOMIC CONCEPTS
+
+Identify the economic concepts relevant to the article.
+
+For every concept:
+- Name the concept
+- Explain it simply
+- Explain how it appears in this article
+
+Prioritise concepts from:
+- Macroeconomics
+- Microeconomics
 - Inflation
-- GDP/growth
+- GDP
+- Interest rates
+- Monetary policy
+- Fiscal policy
+- Exchange rates
+- Trade
+- Employment
+- Demand and supply
+- Market structures
+- Business economics
+
+Only include concepts that are genuinely relevant.
+
+
+## 4. CAUSE AND EFFECT
+
+Explain the economic chain of events step by step.
+
+Use arrows where helpful.
+
+For example:
+
+Higher oil prices
+→ higher input costs
+→ higher transportation costs
+→ higher prices
+→ inflationary pressure
+
+
+## 5. IMPACT ON THE ECONOMY
+
+Discuss only the areas that are actually relevant:
+
+- Inflation
+- GDP / economic growth
 - Employment
 - Interest rates
 - Government finances
-- Businesses/consumers
-Only discuss concepts that are actually relevant.
+- Businesses
+- Consumers
+- Investment
+- Trade
+- Currency / exchange rates
 
-6. CRITICAL THINKING
-Point out important assumptions, limitations, or questions
-a reader should consider.
 
-7. MBA TAKEAWAY
-Give 3-5 things an MBA student should remember from this article.
+## 6. CRITICAL THINKING
 
-Do not invent facts that are not present in the article.
-Clearly distinguish between information stated in the article
-and your own economic interpretation.
-""",
-                                },
-                                {
-                                    "role": "user",
-                                    "content": extracted_text
-                                }
-                            ]
+Give 3–5 questions or limitations that an MBA student should think about.
+
+For example:
+- What assumptions are being made?
+- Who benefits?
+- Who loses?
+- What information is missing?
+- Could there be an alternative explanation?
+- What could happen next?
+
+
+## 7. MBA TAKEAWAY
+
+Give 3–5 concise points that an MBA student should remember
+from this article.
+
+
+IMPORTANT RULES:
+
+1. Do not invent facts.
+2. Do not invent statistics.
+3. If something is not stated in the article, clearly say that
+   it is an interpretation rather than an article fact.
+4. Keep the explanation educational and easy to understand.
+5. Explain technical economic terminology in simple language.
+6. Do not unnecessarily discuss concepts that are unrelated
+   to the article.
+"""
+
+
+                        response = gemini_client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=prompt
                         )
 
-                        analysis = response.output_text
+                        analysis = response.text
 
-                    # -----------------------------
+
+                    # ------------------------------------------------
                     # DISPLAY ANALYSIS
-                    # -----------------------------
+                    # ------------------------------------------------
+
                     st.success(
                         "✅ Article analysed successfully!"
                     )
@@ -203,25 +325,36 @@ and your own economic interpretation.
 
                     st.markdown(analysis)
 
-                    # -----------------------------
-                    # SAVE ANALYSIS
-                    # -----------------------------
-                    supabase.table("articles").update({
-                        "analysis": analysis
-                    }).eq(
-                        "title",
-                        uploaded_file.name
-                    ).execute()
+
+                    # ------------------------------------------------
+                    # SAVE ANALYSIS TO SUPABASE
+                    # ------------------------------------------------
+
+                    with st.spinner(
+                        "💾 Saving analysis..."
+                    ):
+
+                        supabase.table("articles").update(
+                            {
+                                "analysis": analysis
+                            }
+                        ).eq(
+                            "title",
+                            uploaded_file.name
+                        ).execute()
+
 
                     st.success(
-                        "💾 Analysis saved to your article library."
+                        "✅ Analysis saved to your article library."
                     )
+
 
                 except Exception as e:
 
                     st.error(
                         f"Could not analyse the article: {e}"
                     )
+
 
         else:
 
@@ -234,15 +367,18 @@ and your own economic interpretation.
                 "not work yet."
             )
 
+
     except Exception as e:
 
         st.error(
             f"Something went wrong while reading the file: {e}"
         )
 
-# -----------------------------
+
+# ============================================================
 # FOOTER
-# -----------------------------
+# ============================================================
+
 st.divider()
 
 st.caption(
