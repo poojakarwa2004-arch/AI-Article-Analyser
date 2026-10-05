@@ -1,6 +1,5 @@
 import streamlit as st
 import PyPDF2
-import time
 from supabase import create_client
 from google import genai
 
@@ -122,14 +121,16 @@ if uploaded_file is not None:
 
 
         # ----------------------------------------------------
-        # CHECK WHETHER TEXT WAS EXTRACTED
+        # CHECK TEXT
         # ----------------------------------------------------
 
         if extracted_text.strip():
 
             st.subheader("📖 Article Preview")
 
-            with st.expander("Click to view the extracted article"):
+            with st.expander(
+                "Click to view the extracted article"
+            ):
 
                 st.text_area(
                     "Article text",
@@ -142,7 +143,7 @@ if uploaded_file is not None:
 
 
             # =================================================
-            # SAVE + ANALYSE
+            # ANALYSE ARTICLE
             # =================================================
 
             if st.button(
@@ -153,7 +154,7 @@ if uploaded_file is not None:
                 try:
 
                     # ------------------------------------------------
-                    # SAVE ARTICLE TO SUPABASE
+                    # SAVE ARTICLE
                     # ------------------------------------------------
 
                     with st.spinner("💾 Saving article..."):
@@ -165,7 +166,9 @@ if uploaded_file is not None:
                             "analysis": ""
                         }
 
-                        supabase.table("articles").insert(
+                        supabase.table(
+                            "articles"
+                        ).insert(
                             article_data
                         ).execute()
 
@@ -188,15 +191,15 @@ You are an economics tutor helping a first-year MBA student
 understand economic news.
 
 Analyse the article clearly, accurately and in a way that
-helps the student learn economics rather than merely summarising
-the news.
+helps the student learn economics rather than merely
+summarising the news.
 
 ARTICLE:
 
 {extracted_text}
 
 
-Your response must contain the following sections:
+Your response must contain these sections:
 
 ## 1. ARTICLE SUMMARY
 
@@ -225,21 +228,6 @@ For every concept:
 - Explain it simply
 - Explain how it appears in this article
 
-Prioritise concepts from:
-- Macroeconomics
-- Microeconomics
-- Inflation
-- GDP
-- Interest rates
-- Monetary policy
-- Fiscal policy
-- Exchange rates
-- Trade
-- Employment
-- Demand and supply
-- Market structures
-- Business economics
-
 Only include concepts that are genuinely relevant.
 
 
@@ -249,7 +237,7 @@ Explain the economic chain of events step by step.
 
 Use arrows where helpful.
 
-For example:
+Example:
 
 Higher oil prices
 → higher input costs
@@ -276,9 +264,10 @@ Discuss only the areas that are actually relevant:
 
 ## 6. CRITICAL THINKING
 
-Give 3–5 questions or limitations that an MBA student should think about.
+Give 3–5 questions or limitations that an MBA student
+should think about.
 
-For example:
+Consider:
 - What assumptions are being made?
 - Who benefits?
 - Who loses?
@@ -289,49 +278,29 @@ For example:
 
 ## 7. MBA TAKEAWAY
 
-Give 3–5 concise points that an MBA student should remember
-from this article.
+Give 3–5 concise points that an MBA student should
+remember from this article.
 
 
 IMPORTANT RULES:
 
 1. Do not invent facts.
 2. Do not invent statistics.
-3. If something is not stated in the article, clearly say that
-   it is an interpretation rather than an article fact.
-4. Keep the explanation educational and easy to understand.
-5. Explain technical economic terminology in simple language.
-6. Do not unnecessarily discuss concepts that are unrelated
-   to the article.
+3. Clearly distinguish article facts from interpretation.
+4. Keep explanations educational and easy to understand.
+5. Explain technical economic terminology simply.
+6. Do not discuss concepts unrelated to the article.
 """
 
 
-                        import time
+                        response = (
+                            gemini_client.models.generate_content(
+                                model="gemini-3.8-flash",
+                                contents=prompt
+                            )
+                        )
 
-max_attempts = 3
-analysis = None
-
-for attempt in range(max_attempts):
-
-    try:
-
-        response = gemini_client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt
-        )
-
-        analysis = response.text
-        break
-
-    except Exception as e:
-
-        if attempt < max_attempts - 1:
-
-            time.sleep(5)
-
-        else:
-
-            raise e
+                        analysis = response.text
 
 
                     # ------------------------------------------------
@@ -342,20 +311,24 @@ for attempt in range(max_attempts):
                         "✅ Article analysed successfully!"
                     )
 
-                    st.subheader("🧠 Economic Analysis")
+                    st.subheader(
+                        "🧠 Economic Analysis"
+                    )
 
                     st.markdown(analysis)
 
 
                     # ------------------------------------------------
-                    # SAVE ANALYSIS TO SUPABASE
+                    # SAVE ANALYSIS
                     # ------------------------------------------------
 
                     with st.spinner(
                         "💾 Saving analysis..."
                     ):
 
-                        supabase.table("articles").update(
+                        supabase.table(
+                            "articles"
+                        ).update(
                             {
                                 "analysis": analysis
                             }
@@ -384,8 +357,8 @@ for attempt in range(max_attempts):
             )
 
             st.info(
-                "If this is a scanned PDF, text extraction may "
-                "not work yet."
+                "If this is a scanned PDF, text extraction "
+                "may not work yet."
             )
 
 
