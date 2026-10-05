@@ -247,10 +247,15 @@ IMPORTANT:
 
                 try:
 
-                    response = gemini.models.generate_content(
-                        model="gemini-3.8-flash-lite",
-                        contents=prompt
-                    )
+                    models = gemini.models.list()
+
+available_models = []
+
+for model in models:
+    if "generateContent" in model.supported_actions:
+        available_models.append(model.name)
+
+st.write("Available models:", available_models)
 
                     analysis = response.text
                     break
