@@ -1,6 +1,7 @@
 import streamlit as st
 import PyPDF2
 from supabase import create_client
+
 # -----------------------------
 # SUPABASE CONNECTION
 # -----------------------------
@@ -8,6 +9,7 @@ supabase = create_client(
     st.secrets["SUPABASE_URL"],
     st.secrets["SUPABASE_KEY"]
 )
+
 # -----------------------------
 # PAGE CONFIGURATION
 # -----------------------------
@@ -73,18 +75,23 @@ if uploaded_file is not None:
 
     try:
 
+        # -----------------------------
         # PDF
+        # -----------------------------
         if uploaded_file.name.lower().endswith(".pdf"):
 
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
 
             for page in pdf_reader.pages:
+
                 page_text = page.extract_text()
 
                 if page_text:
                     extracted_text += page_text + "\n"
 
+        # -----------------------------
         # TXT
+        # -----------------------------
         elif uploaded_file.name.lower().endswith(".txt"):
 
             extracted_text = uploaded_file.read().decode(
@@ -93,13 +100,14 @@ if uploaded_file is not None:
             )
 
         # -----------------------------
-        # SHOW ARTICLE
+        # CHECK EXTRACTED TEXT
         # -----------------------------
         if extracted_text.strip():
 
             st.subheader("📖 Article Preview")
 
             with st.expander("Click to view the extracted article"):
+
                 st.text_area(
                     "Article text",
                     extracted_text,
@@ -110,29 +118,41 @@ if uploaded_file is not None:
             st.divider()
 
             # -----------------------------
-            # ANALYSE BUTTON
+            # SAVE ARTICLE
             # -----------------------------
             if st.button(
                 "🔍 Analyse Article",
                 use_container_width=True
             ):
 
-                st.success(
-                    "Article uploaded successfully!"
-                )
+                try:
 
-                st.info(
-                    """
-                    AI analysis is the next stage of this application.
+                    # Save article to Supabase
+                    response = supabase.table("articles").insert({
+                        "title": uploaded_file.name,
+                        "source": "Economic Times",
+                        "article_text": extracted_text,
+                        "analysis": ""
+                    }).execute()
 
-                    The uploaded article is ready to be analysed for:
-                    • Simple explanation
-                    • Economic context
-                    • Macroeconomic concepts
-                    • Critical analysis
-                    • Current developments
-                    """
-                )
+                    st.success(
+                        "✅ Article saved successfully!"
+                    )
+
+                    st.info(
+                        """
+                        Your article has been saved to your
+                        personal article library.
+
+                        AI analysis will be added next.
+                        """
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Could not save the article: {e}"
+                    )
 
         else:
 
@@ -141,7 +161,8 @@ if uploaded_file is not None:
             )
 
             st.info(
-                "If this is a scanned PDF, text extraction may not work yet."
+                "If this is a scanned PDF, text extraction "
+                "may not work yet."
             )
 
     except Exception as e:
