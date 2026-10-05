@@ -78,7 +78,7 @@ if page == "📰 Analyse Article":
         )
 
         # ====================================================
-        # EXTRACT ARTICLE TEXT
+        # EXTRACT TEXT
         # ====================================================
 
         extracted_text = ""
@@ -140,7 +140,7 @@ if page == "📰 Analyse Article":
         else:
 
             # =================================================
-            # ARTICLE PREVIEW
+            # PREVIEW
             # =================================================
 
             with st.expander(
@@ -167,7 +167,7 @@ if page == "📰 Analyse Article":
             ):
 
                 # =============================================
-                # AI PROMPT
+                # PROMPT
                 # =============================================
 
                 prompt = f"""
@@ -285,55 +285,47 @@ IMPORTANT RULES:
                     analysis = None
                     last_error = None
 
-
-                    # -----------------------------------------
-                    # FIRST MODEL
-                    # -----------------------------------------
-
-                    for attempt in range(2):
-
-                        try:
-
-                            response = (
-                                gemini.models.generate_content(
-                                    model="gemini-3.1-flash-lite",
-                                    contents=prompt
-                                )
-                            )
-
-                            analysis = response.text
-
-                            break
-
-                        except Exception as e:
-
-                            last_error = e
-
-                            if attempt == 0:
-
-                                time.sleep(5)
+                    models_to_try = [
+                        "gemini-3.1-flash-lite",
+                        "gemini-2.5-flash-lite",
+                        "gemini-3.5-flash-lite",
+                        "gemini-flash-lite-latest",
+                        "gemini-3.6-flash",
+                        "gemini-3.5-flash"
+                    ]
 
 
-                    # -----------------------------------------
-                    # FALLBACK MODEL
-                    # -----------------------------------------
-
-                    if analysis is None:
+                    for model_name in models_to_try:
 
                         try:
 
                             response = (
                                 gemini.models.generate_content(
-                                    model="gemini-3.6-flash",
+                                    model=model_name,
                                     contents=prompt
                                 )
                             )
 
-                            analysis = response.text
+                            if response.text:
+
+                                analysis = response.text
+
+                                st.caption(
+                                    f"Analysis generated using "
+                                    f"{model_name}"
+                                )
+
+                                break
 
                         except Exception as e:
 
                             last_error = e
+
+                            if "503" in str(e):
+
+                                time.sleep(3)
+
+                            continue
 
 
                 # =============================================
@@ -343,8 +335,11 @@ IMPORTANT RULES:
                 if analysis is None:
 
                     st.error(
-                        f"Could not analyse the article: "
-                        f"{last_error}"
+                        "Could not analyse the article."
+                    )
+
+                    st.code(
+                        str(last_error)
                     )
 
 
@@ -508,10 +503,6 @@ elif page == "📚 My Articles":
             )
 
 
-            # =================================================
-            # ARTICLE CARD
-            # =================================================
-
             with st.container(border=True):
 
                 st.subheader(
@@ -595,10 +586,6 @@ elif page == "📚 My Articles":
         delete_col, cancel_col = st.columns(2)
 
 
-        # ----------------------------------------------------
-        # CONFIRM DELETE
-        # ----------------------------------------------------
-
         with delete_col:
 
             if st.button(
@@ -635,10 +622,6 @@ elif page == "📚 My Articles":
                     )
 
 
-        # ----------------------------------------------------
-        # CANCEL
-        # ----------------------------------------------------
-
         with cancel_col:
 
             if st.button(
@@ -666,10 +649,6 @@ elif page == "📚 My Articles":
     if selected_id:
 
         st.divider()
-
-        # ----------------------------------------------------
-        # GET SELECTED ARTICLE DIRECTLY FROM SUPABASE
-        # ----------------------------------------------------
 
         try:
 
@@ -702,10 +681,6 @@ elif page == "📚 My Articles":
             )
 
 
-        # ----------------------------------------------------
-        # DISPLAY SELECTED ARTICLE
-        # ----------------------------------------------------
-
         if selected_article:
 
             st.header(
@@ -722,9 +697,9 @@ elif page == "📚 My Articles":
             )
 
 
-            # ------------------------------------------------
+            # -----------------------------------------------
             # CLOSE
-            # ------------------------------------------------
+            # -----------------------------------------------
 
             if st.button(
                 "✕ Close Article",
@@ -742,9 +717,9 @@ elif page == "📚 My Articles":
             st.divider()
 
 
-            # ------------------------------------------------
+            # -----------------------------------------------
             # ORIGINAL ARTICLE
-            # ------------------------------------------------
+            # -----------------------------------------------
 
             st.subheader(
                 "📄 Original Article"
@@ -765,9 +740,9 @@ elif page == "📚 My Articles":
             st.divider()
 
 
-            # ------------------------------------------------
-            # ECONOMIC ANALYSIS
-            # ------------------------------------------------
+            # -----------------------------------------------
+            # ANALYSIS
+            # -----------------------------------------------
 
             st.subheader(
                 "🧠 Economic Analysis"
