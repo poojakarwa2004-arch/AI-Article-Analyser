@@ -50,7 +50,7 @@ st.divider()
 
 
 # ============================================================
-# WHAT THE APP DOES
+# FEATURES
 # ============================================================
 
 st.subheader("What can you do here?")
@@ -94,7 +94,7 @@ if uploaded_file is not None:
     try:
 
         # ----------------------------------------------------
-        # PDF
+        # EXTRACT PDF TEXT
         # ----------------------------------------------------
 
         if uploaded_file.name.lower().endswith(".pdf"):
@@ -110,7 +110,7 @@ if uploaded_file is not None:
 
 
         # ----------------------------------------------------
-        # TXT
+        # EXTRACT TXT
         # ----------------------------------------------------
 
         elif uploaded_file.name.lower().endswith(".txt"):
@@ -125,7 +125,22 @@ if uploaded_file is not None:
         # CHECK TEXT
         # ----------------------------------------------------
 
-        if extracted_text.strip():
+        if not extracted_text.strip():
+
+            st.warning(
+                "I couldn't extract any text from this file."
+            )
+
+            st.info(
+                "If this is a scanned PDF, text extraction "
+                "may not work yet."
+            )
+
+        else:
+
+            # ------------------------------------------------
+            # ARTICLE PREVIEW
+            # ------------------------------------------------
 
             st.subheader("📖 Article Preview")
 
@@ -144,7 +159,7 @@ if uploaded_file is not None:
 
 
             # =================================================
-            # ANALYSE ARTICLE
+            # ANALYSE BUTTON
             # =================================================
 
             if st.button(
@@ -154,11 +169,13 @@ if uploaded_file is not None:
 
                 try:
 
-                    # ------------------------------------------------
+                    # =========================================
                     # SAVE ARTICLE
-                    # ------------------------------------------------
+                    # =========================================
 
-                    with st.spinner("💾 Saving article..."):
+                    with st.spinner(
+                        "💾 Saving article..."
+                    ):
 
                         article_data = {
                             "title": uploaded_file.name,
@@ -173,15 +190,14 @@ if uploaded_file is not None:
                             article_data
                         ).execute()
 
-
                     st.success(
                         "✅ Article saved successfully!"
                     )
 
 
-                    # ------------------------------------------------
+                    # =========================================
                     # AI ANALYSIS
-                    # ------------------------------------------------
+                    # =========================================
 
                     with st.spinner(
                         "🧠 Analysing the article..."
@@ -191,33 +207,29 @@ if uploaded_file is not None:
 You are an economics tutor helping a first-year MBA student
 understand economic news.
 
-Analyse the article clearly, accurately and in a way that
-helps the student learn economics rather than merely
-summarising the news.
+Analyse the article clearly, accurately and educationally.
 
 ARTICLE:
 
 {extracted_text}
 
 
-Your response must contain these sections:
+Your response must contain:
 
 ## 1. ARTICLE SUMMARY
 
 Explain what happened in simple language.
 
-Focus on:
+Include:
 - What happened?
 - Who is involved?
 - What is changing?
-- What are the important numbers or facts?
+- Important numbers or facts.
 
 
 ## 2. WHY IT MATTERS
 
-Explain why this development is economically important.
-
-Connect the news to the broader economy wherever relevant.
+Explain why the development is economically important.
 
 
 ## 3. KEY ECONOMIC CONCEPTS
@@ -229,14 +241,14 @@ For every concept:
 - Explain it simply
 - Explain how it appears in this article
 
-Only include concepts that are genuinely relevant.
+Only include genuinely relevant concepts.
 
 
 ## 4. CAUSE AND EFFECT
 
-Explain the economic chain of events step by step.
+Explain the economic chain step by step.
 
-Use arrows where helpful.
+Use arrows where useful.
 
 Example:
 
@@ -249,7 +261,7 @@ Higher oil prices
 
 ## 5. IMPACT ON THE ECONOMY
 
-Discuss only the areas that are actually relevant:
+Discuss only relevant areas:
 
 - Inflation
 - GDP / economic growth
@@ -265,62 +277,69 @@ Discuss only the areas that are actually relevant:
 
 ## 6. CRITICAL THINKING
 
-Give 3–5 questions or limitations that an MBA student
-should think about.
+Give 3–5 questions or limitations an MBA student
+should consider.
 
-Consider:
-- What assumptions are being made?
-- Who benefits?
-- Who loses?
-- What information is missing?
-- Could there be an alternative explanation?
-- What could happen next?
+Think about:
+- Assumptions
+- Winners and losers
+- Missing information
+- Alternative explanations
+- What could happen next
 
 
 ## 7. MBA TAKEAWAY
 
-Give 3–5 concise points that an MBA student should
-remember from this article.
+Give 3–5 concise points an MBA student should remember.
 
 
-IMPORTANT RULES:
+IMPORTANT:
 
 1. Do not invent facts.
 2. Do not invent statistics.
 3. Clearly distinguish article facts from interpretation.
-4. Keep explanations educational and easy to understand.
-5. Explain technical economic terminology simply.
-6. Do not discuss concepts unrelated to the article.
+4. Explain technical economic terminology simply.
+5. Do not discuss unrelated economic concepts.
 """
 
 
-                        max_attempts = 3
-analysis = None
+                        # =====================================
+                        # GEMINI WITH RETRIES
+                        # =====================================
 
-for attempt in range(max_attempts):
+                        analysis = None
+                        last_error = None
 
-    try:
+                        for attempt in range(3):
 
-        response = gemini_client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt
-        )
+                            try:
 
-        analysis = response.text
-        break
+                                response = (
+                                    gemini_client.models.generate_content(
+                                        model="gemini-3.8-flash",
+                                        contents=prompt
+                                    )
+                                )
 
-    except Exception as e:
+                                analysis = response.text
+                                break
 
-        error_message = str(e)
+                            except Exception as e:
 
-        if "503" in error_message and attempt < max_attempts - 1:
-            time.sleep(5)
-        else:
-            raise e
+                                last_error = e
 
-                    # ------------------------------------------------
+                                if attempt < 2:
+
+                                    time.sleep(5)
+
+                                else:
+
+                                    raise last_error
+
+
+                    # =========================================
                     # DISPLAY ANALYSIS
-                    # ------------------------------------------------
+                    # =========================================
 
                     st.success(
                         "✅ Article analysed successfully!"
@@ -333,9 +352,9 @@ for attempt in range(max_attempts):
                     st.markdown(analysis)
 
 
-                    # ------------------------------------------------
+                    # =========================================
                     # SAVE ANALYSIS
-                    # ------------------------------------------------
+                    # =========================================
 
                     with st.spinner(
                         "💾 Saving analysis..."
@@ -352,7 +371,6 @@ for attempt in range(max_attempts):
                             uploaded_file.name
                         ).execute()
 
-
                     st.success(
                         "✅ Analysis saved to your article library."
                     )
@@ -363,25 +381,6 @@ for attempt in range(max_attempts):
                     st.error(
                         f"Could not analyse the article: {e}"
                     )
-
-
-        else:
-
-            st.warning(
-                "I couldn't extract any text from this file."
-            )
-
-            st.info(
-                "If this is a scanned PDF, text extraction "
-                "may not work yet."
-            )
-
-
-    except Exception as e:
-
-        st.error(
-            f"Something went wrong while reading the file: {e}"
-        )
 
 
 # ============================================================
