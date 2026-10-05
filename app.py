@@ -1,5 +1,6 @@
 import streamlit as st
 import PyPDF2
+import time
 from supabase import create_client
 from google import genai
 
@@ -305,12 +306,32 @@ IMPORTANT RULES:
 """
 
 
-                        response = gemini_client.models.generate_content(
-                            model="gemini-3.8-flash",
-                            contents=prompt
-                        )
+                        import time
 
-                        analysis = response.text
+max_attempts = 3
+analysis = None
+
+for attempt in range(max_attempts):
+
+    try:
+
+        response = gemini_client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt
+        )
+
+        analysis = response.text
+        break
+
+    except Exception as e:
+
+        if attempt < max_attempts - 1:
+
+            time.sleep(5)
+
+        else:
+
+            raise e
 
 
                     # ------------------------------------------------
